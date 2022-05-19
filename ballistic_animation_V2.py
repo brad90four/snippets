@@ -1,25 +1,15 @@
 # ballistic_animation
 
 import numpy as np
-import pyqtgraph as pg
-import pyqtgraph.parametertree.parameterTypes as pTypes
 
+import pyqtgraph as pg
 from pyqtgraph.parametertree import Parameter, ParameterTree
 from pyqtgraph.Qt import QtGui
-from tkinter import simpledialog, Tk
 
-
-# root = Tk()
-# root.withdraw()
-# V = simpledialog.askinteger("Initial Velocity", "Enter the initial velocity in m/s", parent=root)
-# theta = simpledialog.askinteger("Launch Angle", "Enter the launch angle in degrees", parent=root)
-# root.destroy()
-
-# testing values
-# V = 10
-# theta = 45
-
-params = [{"name": "Initial Velocity", "type": "int", "value": 10}, {"name": "Launch Angle", "type": "int", "value": 45}]
+params = [
+    {"name": "Initial Velocity", "type": "int", "value": 10},
+    {"name": "Launch Angle", "type": "int", "value": 45},
+]
 
 app = pg.mkQApp("Ballistic Animation")
 
@@ -36,7 +26,7 @@ def x_pos(x_0: int, v_x: int, t_i: int) -> int:
 
 def y_pos(y_0: int, v_y: int, t_i: int) -> int:
     """Calculate y displacement."""
-    return y_0 + v_y * t_i - (0.5 * g * t_i ** 2)
+    return y_0 + v_y * t_i - (0.5 * g * t_i**2)
 
 
 def x_vel(V: int, theta: int) -> int:
@@ -56,20 +46,14 @@ theta = p["Launch Angle"]
 print(f"{V = }\n{theta = }")
 
 
-# v_x = V * np.cos(np.deg2rad(theta))  # initial x velocity in m/s
-# v_y = V * np.sin(np.deg2rad(theta))  # initial y velocity in m/s
-
 t_end = (2 * y_vel(V, theta)) / g  # flight time in s
 time_steps = t_end * 30  # number of time steps (flight time * fps)
 time = np.arange(0, t_end, 1 / 30).tolist()  # range of time
-y_max = (V ** 2 * np.sin(np.deg2rad(theta)) ** 2) / (2 * g)  # maximum height in m
-x_max = (V ** 2 * np.sin(np.deg2rad(2 * theta))) / (g)  # maximum range in m
+y_max = (V**2 * np.sin(np.deg2rad(theta)) ** 2) / (2 * g)  # maximum height in m
+x_max = (V**2 * np.sin(np.deg2rad(2 * theta))) / (g)  # maximum range in m
 
 X = [x_pos(x_0, x_vel(V, theta), i) for i in time]
 Y = [y_pos(y_0, y_vel(V, theta), i) for i in time]
-
-# X = [x_pos(x_0, v_x, i) for i in t]
-# Y = [y_pos(y_0, v_y, i) for i in t]
 
 win = QtGui.QWidget()
 layout = QtGui.QGridLayout()
