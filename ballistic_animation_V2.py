@@ -1,20 +1,19 @@
 # ballistic_animation
 import os
 from pathlib import Path
+
 import numpy as np
+from PIL import Image
 
 import pyqtgraph as pg
-import pyqtgraph.exporters
+from pyqtgraph.exporters import ImageExporter
 from pyqtgraph.parametertree import Parameter, ParameterTree
-from pyqtgraph.Qt import QtGui
-from PIL import Image
-import cv2
-
+from pyqtgraph.Qt import QtCore, QtWidgets
 
 params = [
     {"name": "Initial Velocity", "type": "int", "value": 10},
     {"name": "Launch Angle", "type": "int", "value": 45},
-    {"name": "Go!", "type": "action"}
+    {"name": "Go!", "type": "action"},
 ]
 
 app = pg.mkQApp("Ballistic Animation")
@@ -22,6 +21,23 @@ p = Parameter.create(name="params", type="group", children=params)
 t = ParameterTree()
 t.setParameters(p, showTop=False)
 t.setWindowTitle("Starting Values")
+
+win = QtWidgets.QWidget()
+layout = QtWidgets.QGridLayout()
+win.setLayout(layout)
+plot_1 = pg.PlotWidget()
+curve = pg.PlotCurveItem([0, 1], [0, 1])
+a = pg.CurveArrow(curve)
+a.setStyle(headLen=40)
+layout.addWidget(plot_1, 0, 0, 1, 1)
+layout.addWidget(t, 1, 0, 1, 1)
+
+animation = None
+screenshotTimer = None
+counter = 0
+screenshotFolder = os.path.join(Path(__file__).parent, "screenshots")
+
+g = 9.8  # acceleration due to gravity in m/s**2
 
 
 def x_pos(x_0: int, v_x: int, t_i: int) -> int:
@@ -42,51 +58,50 @@ def y_vel(V: int, theta: int) -> int:
     return V * np.sin(np.deg2rad(theta))
 
 
-g = 9.8  # acceleration due to gravity in m/s**2
-
-win = QtGui.QWidget()
-layout = QtGui.QGridLayout()
-win.setLayout(layout)
-plot_1 = pg.PlotWidget()
-curve = pg.PlotCurveItem([0, 1], [0, 1])
-a = pg.CurveArrow(curve)
-a.setStyle(headLen=40)
-layout.addWidget(plot_1, 0, 0, 1, 1)
-layout.addWidget(t, 1, 0, 1, 1)
-
-animation = None
+def screenshot():
+    global counter
+    # Give the exporter the scene you want to render
+    exporter = ImageExporter(plot_1.plotItem)
+    exporter.export(f"{screenshotFolder}/{counter}.png")
+    counter += 1
 
 
 def run():
-    plot_1.clear()
+    # plot_1.clear()
     V = p["Initial Velocity"]
     theta = p["Launch Angle"]
     print(f"{V = }\n{theta = }")
     x_0 = 0  # initial x position in m
     y_0 = 0  # initial y position in m
     t_end = (2 * y_vel(V, theta)) / g  # flight time in s
+    updateIntervalSeconds = t_end / 30
     time = np.arange(0, t_end, 1 / 30).tolist()  # range of time
-    y_max = (V ** 2 * np.sin(np.deg2rad(theta)) ** 2) / (2 * g)  # maximum height in m
-    x_max = (V ** 2 * np.sin(np.deg2rad(2 * theta))) / (g)  # maximum range in m
+    y_max = (V**2 * np.sin(np.deg2rad(theta)) ** 2) / (2 * g)  # maximum height in m
+    x_max = (V**2 * np.sin(np.deg2rad(2 * theta))) / (g)  # maximum range in m
+
     max_range = pg.TextItem(text=f"Range: {x_max:.2f}")
     max_height = pg.TextItem(text=f"Max Height: {y_max:.2f}", anchor=(0, 1))
-    X = [x_pos(x_0, x_vel(V, theta), i) for i in time]
-    Y = [y_pos(y_0, y_vel(V, theta), i) for i in time]
-    for item in max_range, max_height, a, curve:
-        plot_1.addItem(item)
-    curve.setData(X, Y)
-    # max_height.setText(f"Max Height: {max_height:.2f}")
-    # max_range.setText(f"Range: {max_range:.2f}")
     max_range.setPos(x_max, 0)
     max_height.setPos(x_max / 2, y_max)
-    global animation
-    animation = a.makeAnimation(loop=-1)
+
+    X = [x_pos(x_0, x_vel(V, theta), i) for i in time]
+    Y = [y_pos(y_0, y_vel(V, theta), i) for i in time]
+
+    for item in max_range, max_height, a, curve:
+        plot_1.addItem(item)
+
+    curve.setData(X, Y)
+
+    global animation, screenshotTimer
+    animation = a.makeAnimation(duration=int(t_end) * 1000)
     animation.start()
 
-
-image_folder = Path(__file__).parent
-image_list = sorted(os.listdir(image_folder), key=os.path.getctime)
-all_images = [image for image in image_list if "png" in image]
+    # Fire "screenshot" every "update" milliseconds
+    # Stop when animation is over
+    screenshotTimer = QtCore.QTimer()
+    screenshotTimer.timeout.connect(screenshot)
+    animation.finished.connect(screenshotTimer.stop)
+    screenshotTimer.start(int(updateIntervalSeconds * 1000))
 
 
 def gif(save_name: str) -> None:
@@ -95,13 +110,18 @@ def gif(save_name: str) -> None:
     Args:
         save_name (str): Save name for the file.
     """
+    base_dir = Path(__file__).parent
+    image_folder = os.path.join(base_dir, "screenshots")
+    os.chdir(image_folder)
+    image_list = sorted(os.listdir(image_folder), key=os.path.getctime)
+    all_images = [image for image in image_list if "png" in image]
     images = [Image.open(file) for file in all_images]
     images[0].save(
         f"{os.path.join(image_folder, save_name)}.gif",
         save_all=True,
         append_images=images,
         optimize=True,
-        # duration=200,
+        fps=30,
         loop=0,
     )
 
